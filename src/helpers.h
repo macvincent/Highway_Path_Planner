@@ -4,10 +4,11 @@
 #include <math.h>
 #include <string>
 #include <vector>
-
 // for convenience
 using std::string;
 using std::vector;
+using Eigen::MatrixXd;
+using Eigen::VectorXd;
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -153,5 +154,25 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s,
 
   return {x,y};
 }
+vector<double> JMT(vector<double> &start, vector<double> &end, double T) {
+   MatrixXd tMatrix = MatrixXd(3,3);
+   MatrixXd sMatrix = MatrixXd(3,1);
+   MatrixXd result = MatrixXd(3,1);
+   tMatrix << pow(T, 3), pow(T, 4), pow(T, 5),
+        3*pow(T,2), 4*pow(T,3), 5*pow(T, 4),
+        6*T, 12*pow(T,2), 20*pow(T,3);
+        
+   sMatrix << end[0] - (start[0] + start[1]*T + 0.5*start[2]*pow(T,2)),
+            end[1] - (start[1] + start[2]*T),
+            end[2] - start[2];
+            
+    MatrixXd inverseT = tMatrix.inverse();
+    result = inverseT * sMatrix;
+    vector<double>r{start[0],start[1],0.5*start[2],result.data()[0],result.data()[1], result.data()[2]};
+    return r;
+}
 
+double generate_s(vector<double>& a, double t){
+  return a[0] + a[1] * t + a[2] * pow(t,2) + a[3] * pow(t,3) + a[4] * pow(t,4) + a[5] * pow(t,5);
+}
 #endif  // HELPERS_H
