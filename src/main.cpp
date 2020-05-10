@@ -1,14 +1,11 @@
 #include <uWS/uWS.h>
 #include <fstream>
-#include <iostream>
 #include <string>
 #include <vector>
 #include "./eigen/Eigen/Dense"
 #include "helpers.h"
-#include "json.hpp"
 #include "spline.h"
 // for convenience
-using nlohmann::json;
 using std::string;
 using std::vector;
 
@@ -49,11 +46,11 @@ int main() {
     map_waypoints_dy.push_back(d_y);
   }
   int lane_num = 1;
-  double ref_vel = 49.5;
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
-               &map_waypoints_dx,&map_waypoints_dy, &lane_num, &ref_vel]
+  double ref_vel = 0;
+  h.onMessage([&]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                uWS::OpCode opCode) {
+                 
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -86,9 +83,34 @@ int main() {
           // Sensor Fusion Data, a list of all other cars on the same side 
           //   of the road.
           auto sensor_fusion = j[1]["sensor_fusion"];
+          int prev_path_size = previous_path_x.size();
+
+          // Sensor Fusion
+          if(prev_path_size > 0) car_s = end_path_s;
+          bool too_close = false;
+          for(int i = 0; i < sensor_fusion.size(); i++){
+            float d_value = sensor_fusion[i][6];
+            if(d_value < (4*lane_num + 4) && d_value > (4*lane_num)){
+              double vx = sensor_fusion[i][3];
+              double vy = sensor_fusion[i][4];
+              double check_speed = sqrt(pow(vx, 2) + pow(vy, 2));
+              double check_car_s = sensor_fusion[i][5];
+
+              check_car_s += double(prev_path_size)*0.02*check_speed;
+              if(check_car_s > car_s && (check_car_s - car_s) < 30){
+                int prev_lane = lane_num;
+                if(lane_num == 0 || lane_num == 2) change_lane(lane_num, sensor_fusion, prev_path_size, car_speed, car_s, 1);
+                else{
+                  change_lane(lane_num, sensor_fusion, prev_path_size, car_speed, car_s, 0);
+                  change_lane(lane_num, sensor_fusion, prev_path_size, car_speed, car_s, 2);
+                }
+                if(prev_lane == lane_num)too_close = true;
+                break;
+              }
+            }
+          }
 
           json msgJson;
-          int prev_path_size = previous_path_x.size();
           vector<double> next_x_vals;
           vector<double> next_y_vals;
           // sparse points that we will later pass through the spline
@@ -141,20 +163,21 @@ int main() {
           }
           tk::spline s;
           s.set_points(ptsx, ptsy);
+
           for(unsigned int i = 0; i < previous_path_x.size(); i++){
             next_x_vals.push_back(previous_path_x[i]);
             next_y_vals.push_back(previous_path_y[i]);
           }
+          
           double target_x = 30.0;
           double target_y = s(target_x);
           double target_distance = sqrt(pow(target_x, 2) + pow(target_y,2));
           double x_add_on = 0;
-          /**
-           * TODO: define a path made up of (x,y) points that the car will visit
-           *   sequentially every .02 seconds
-           */
-          double N = target_distance/(0.02*ref_vel/2.24);
+
           for(int i = 0; i < 50 - prev_path_size; i++){
+            if(too_close) ref_vel -= 0.224;
+            else if(ref_vel < 49) ref_vel += 0.224;
+            double N = target_distance/(0.02*ref_vel/2.24);
             double x_point = x_add_on+(target_x/N);
             double y_point = s(x_point);
 

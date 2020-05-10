@@ -2,9 +2,12 @@
 #define HELPERS_H
 
 #include <math.h>
+#include "json.hpp"
+#include <iostream>
 #include <string>
 #include <vector>
 // for convenience
+using nlohmann::json;
 using std::string;
 using std::vector;
 using Eigen::MatrixXd;
@@ -174,5 +177,28 @@ vector<double> JMT(vector<double> &start, vector<double> &end, double T) {
 
 double generate_s(vector<double>& a, double t){
   return a[0] + a[1] * t + a[2] * pow(t,2) + a[3] * pow(t,3) + a[4] * pow(t,4) + a[5] * pow(t,5);
+}
+
+void change_lane(int& lane_num, json& sensor_fusion, int prev_path_size, double car_speed, double car_s, int new_lane){
+  bool can_change = true;
+  for(int j = 0; j < sensor_fusion.size(); j++){
+      float temp_d_value = sensor_fusion[j][6];
+      if(temp_d_value < (4*new_lane + 4) && temp_d_value > (4*new_lane)){
+        double tvx = sensor_fusion[j][3];
+        double tvy = sensor_fusion[j][4];
+        double tcheck_speed = sqrt(pow(tvx, 2) + pow(tvy, 2));
+        double tcheck_car_s = sensor_fusion[j][5];
+        tcheck_car_s += double(prev_path_size) * 0.02 * tcheck_speed;
+        double temp_car_s = car_s + double(prev_path_size) * 0.02 * car_speed;
+        std::cout << fabs(temp_car_s - tcheck_car_s) << std::endl;
+        if(fabs(temp_car_s - tcheck_car_s) < 50) {
+          can_change = false;
+          break;
+        }
+      }
+  }
+  if(can_change) {
+    lane_num = new_lane;
+  }
 }
 #endif  // HELPERS_H
