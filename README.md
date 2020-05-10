@@ -65,6 +65,26 @@ the path has processed since last time.
 
 2. There will be some latency between the simulator running and the path planner returning a path, with optimized code usually its not very long maybe just 1-3 time steps. During this delay the simulator will continue using points that it was last given, because of this its a good idea to store the last points you have used so you can have a smooth transition. previous_path_x, and previous_path_y can be helpful for this transition since they show the last points given to the simulator controller with the processed points already removed. You would either return a path that extends this previous path or make sure to create a new path that has a smooth transition with this last path.
 
+## Model Documentation
+* We received data about the ego vehicle's location and velocity and sensor fusion data about the location and velocities of surrounding vehicles
+  * If there is a vehicle 30m ahead of the ego vehicle, consider changing lanes
+    * For each new potential new lane, check if there will be a vehicle 50 m of the ego vehicle after the lane change
+      * If there is, do not change lanes
+      * else change lanes
+    * If no lane changes are made initialize `too_close` boolean to a true value
+  * We initialize a `ptsx` and `ptsy` vector of doubles to hold trajectory that either consist of the last two values in `previous_path` vectors or the current location of the ego vehicle and a previous location derived based on vehicle heading
+  * We add three more values to `ptsx` and `ptsy` incremented on a 30 meters interval from the current s location of our ego car
+  * We normalize the five locations in `ptsx` and `ptsy` to origin co-ordinates from vehicle co-ordinates to simplify our calculations
+  * We pass the normalized value to a `spline` object. The purpose of using the `spline` object is to reduce jerk reactions in the trajectory to be generated.
+  * We transfer the remaining values from our `previous_path` to `next_y_vals` and `next_x_vals` vectors of doubles
+  * Using our `spline` object, we generate new poins for the `next_y_vals` and `next_x_vals` vectors to ensure we have at least 50 points for our ego vehicles
+    * We update our velocity based on the value of `too_close`
+    * We generate new x and y values for our trajectory using the `spline` object and our new velocity;
+    * We shift our new x and y values back to vehicle co-ordinates
+    * We update `next_y_vals` and `next_x_vals` with our new x and y values
+  * We return `next_y_vals` and `next_x_vals` to the ego vehicle
+
+
 ## Tips
 
 A really helpful resource for doing this project and creating smooth trajectories was using http://kluge.in-chemnitz.de/opensource/spline/, the spline function is in a single hearder file is really easy to use.
@@ -91,55 +111,3 @@ A really helpful resource for doing this project and creating smooth trajectorie
     cd uWebSockets
     git checkout e94b6e1
     ```
-
-## Editor Settings
-
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
-## Code Style
-
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
-
-## Project Instructions and Rubric
-
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
-
-
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
-
